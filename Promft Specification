@@ -18,7 +18,7 @@ db = SQLDatabase.from_uri("mysql+pymysql://nicegpt:gpttest2024!@59.16.185.27:503
 print("######"+db.dialect + "db 연결 완료 ######")
 print(db.get_usable_table_names())
 
-llm = ChatOpenAI(model="gpt-4o", temperature=0,api_key="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")
+llm = ChatOpenAI(model="gpt-4o", temperature=0,api_key="")
 chain = create_sql_query_chain(llm, db)
 response = chain.invoke({"question": ""})
 response
