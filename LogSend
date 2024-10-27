@@ -1,0 +1,77 @@
+import smtplib
+import re
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.base import MIMEBase  
+from email import encoders  # 인코딩을 위한 모듈 추가
+import os
+import datetime
+
+# YYYYMMDD 형식의 날짜 입력을 받는 함수
+def get_date_input():
+    while True:
+        user_input = input("파일명을 지정할 날짜를 YYYYMMDD 형식으로 입력하세요 (예: 20241026): ")
+        try:
+            # 입력한 날짜가 유효한지 검사
+            datetime.datetime.strptime(user_input, "%Y%m%d")
+            return user_input
+        except ValueError:
+            print("유효하지 않은 날짜 형식입니다. 다시 입력해주세요.")
+
+# 이메일 발송 함수
+def send_email(addr):
+    reg = r"^[a-zA-Z0-9.+_-]+@[a-zA-Z0-9]+\.[a-zA-Z]{2,3}$"
+    if not re.match(reg, addr):
+        print("받으실 메일 주소를 정확히 입력하십시오.")
+        return
+
+    smtp_server = "smtp.gmail.com"
+    smtp_port = 465
+    try:
+        smtp = smtplib.SMTP_SSL(smtp_server, smtp_port)
+        smtp.login(my_account, my_password)
+
+        smtp.sendmail(my_account, addr, msg.as_string())
+        print("정상적으로 메일이 발송되었습니다.")
+    except Exception as e:
+        print(f"메일 전송 중 오류가 발생했습니다: {e}")
+    finally:
+        smtp.quit()
+
+# 로그인 정보 설정 (앱 비밀번호 사용)
+my_account = "osm9357@gmail.com"
+my_password = "opbg ucrq hlgg nmcm"  # 앱 비밀번호 사용
+
+to_mail = "chlrkd0103@naver.com"
+
+msg = MIMEMultipart()
+msg["Subject"] = "첨부 파일 확인 바랍니다"
+msg["From"] = my_account
+msg["To"] = to_mail
+
+content = """안녕하세요. 
+PosToCat Log파일을 전달드립니다.
+감사합니다.
+"""
+content_part2024 = MIMEText(content, "plain")
+msg.attach(content_part)
+
+# 사용자로부터 날짜 입력받기
+current_date = get_date_input()
+
+# 파일 경로와 날짜 조합하여 로그 파일명 생성
+log_file_path = f"C:/NICElog/{current_date}.log"
+
+try:
+    with open(log_file_path, 'rb') as file:
+        # MIMEBase로 파일을 첨부 (이미지 대신 일반 파일에 맞게)
+        part = MIMEBase('application', 'octet-stream')
+        part.set_payload(file.read())
+        encoders.encode_base64(part)
+        part.add_header('Content-Disposition', f'attachment; filename={os.path.basename(log_file_path)}')
+        msg.attach(part)
+except FileNotFoundError:
+    print(f"파일 '{log_file_path}'을(를) 찾을 수 없습니다.")
+
+# 메일 전송
+send_email(to_mail)
