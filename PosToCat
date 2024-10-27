@@ -1,0 +1,60 @@
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseDownload
+import io
+import pandas as pd
+import openai
+
+# 서비스 계정 파일 경로 (Google Cloud에서 생성한 JSON 키 파일)
+SERVICE_ACCOUNT_FILE = 'd:/Users/NICE/Downloads/vocal-mountain-439700-a0-f6345d624cd4.json'
+open_ai_key = 'openai key'  # Openai Key
+openai.api_key = open_ai_key
+
+# Google Drive API 설정
+SCOPES = ['https://www.googleapis.com/auth/drive.readonly']
+credentials = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
+
+# Google Drive API 클라이언트 생성
+drive_service = build('drive', 'v3', credentials=credentials)
+
+# 파일 ID로 Google Drive의 파일 다운로드
+file_id = '1edm2nj4OA37CtQa9j1ZMarGFOx33nZ3X'  # Google Drive 파일의 ID
+request = drive_service.files().get_media(fileId=file_id)
+file_stream = io.BytesIO()
+downloader = MediaIoBaseDownload(file_stream, request)
+done = False
+while not done:
+    status, done = downloader.next_chunk()
+    print(f"Download progress: {int(status.progress() * 100)}%")
+
+# 다운로드된 파일을 엑셀 파일로 읽기
+file_stream.seek(0)  # 파일 포인터를 처음으로 되돌림
+excel_data = pd.read_excel(file_stream)
+
+# 엑셀 데이터를 텍스트로 변환 (열과 행을 문자열로 변환하여 질문에 사용할 수 있도록 준비)
+doc_text = excel_data.to_string(index=False)
+
+# ChatGPT를 통해 질문에 답변을 얻기 위한 함수
+def ask_question(question, doc_text):
+    response = openai.ChatCompletion.create(
+        model="gpt-3.5-turbo",  # GPT Model
+        messages=[
+            {"role": "system", "content": """너는 나이스정보통신 10년차 CAT 단말기 모듈 개발자이자 민원 응대 챗봇이야. 축적된 데이터베이스 범위 안에서만 대답해주고, 알고 있는 만큼 전부 한국어로 답변해줘. 만약 답변할 데이터가 부족하거나 모르는 내용일 경우, CS개발실 담당자 연락처는 '02-2187-3638' 이라고 안내해줘.
+ 만약, 전문Format과 관련된 민원을 받았을 경우에는 자동으로 민원 고객 PC의 Log파일을 추출할수 있도록 안내해줘. Log파일 경로는 C:/NICElog 이니까 참조해.
+ 표 또는 그림 형식으로 출력 요청 시에는, 표 또는 그림으로 생성해줘. 나이스정보통신 CAT 모듈 내용을 이해하고, 사용자가 CAT 단말기 관련된 특정 상황에 대해 물어볼 때 규정을 'file_id' 파일을 기반으로 정확한 답변을 제공해야 해."""},
+            {"role": "system", "content": f"PosToCat 요약:\n{doc_text}"},
+            {"role": "user", "content": question}
+        ],
+        max_tokens=1000,
+        n=1,
+        stop=None,
+        temperature=0,
+    )
+    return response['choices'][0]['message']['content'].strip()
+
+# 사용자 질문 입력받기
+user_question = "CAT단말기 종류에 대해 설명해줘."
+
+# 질문에 대한 답변 출력
+answer = ask_question(user_question, doc_text)
+print(answer)  
