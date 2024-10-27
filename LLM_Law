@@ -1,0 +1,59 @@
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseDownload
+import io
+from docx import Document
+import openai
+
+# 서비스 계정 파일 경로 (Google Cloud에서 생성한 JSON 키 파일)
+SERVICE_ACCOUNT_FILE = 'd:/Users/NICE/Downloads/vocal-mountain-439700-a0-f6345d624cd4.json'
+open_ai_key = 'sk-proj-NYGK9Blj4JmZecnjqakPT3BlbkFJIPSWSxfbt2lve67I2Pbg'  # Openai Key
+openai.api_key = open_ai_key
+
+# Google Drive API 설정
+SCOPES = ['https://www.googleapis.com/auth/drive.readonly']
+credentials = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
+
+# Google Drive API 클라이언트 생성
+drive_service = build('drive', 'v3', credentials=credentials)
+
+# 파일 ID로 Google Drive의 파일 다운로드
+file_id = '1qrEc5SIW61R4VzwJMzzbMon2vbJ8j4_z'  # Google Drive 파일의 ID
+request = drive_service.files().get_media(fileId=file_id)
+file_stream = io.BytesIO()
+downloader = MediaIoBaseDownload(file_stream, request)
+
+done = False
+while not done:
+    status, done = downloader.next_chunk()
+    print(f"Download progress: {int(status.progress() * 100)}%")
+
+# 다운로드된 파일을 docx로 읽기
+file_stream.seek(0)
+doc = Document(file_stream)
+
+# 문서의 모든 텍스트를 하나의 문자열로 결합
+doc_text = "\n".join([para.text for para in doc.paragraphs])
+
+# ChatGPT를 통해 질문에 답변을 얻기 위한 함수
+def ask_question(question, doc_text):
+    response = openai.ChatCompletion.create(
+        model="gpt-4",
+        messages=[
+            {"role": "system", "content": """너는 나이스정보통신 10년차 청원 내규 담당 챗봇이야. 축적된 데이터베이스 범위 안에서만 대답해주고, 알고 있는 만큼 전부 한국어로 답변해줘.
+            'file_id' 의 파일 내 데이터 기반으로 대답해줘야하며, 질문에 대해서 일목요연하게 정리해서 대답해줘야해"""},
+            {"role": "user", "content": f"Document content:\n{doc_text[:1000]}\n\nQuestion: {question}"}
+        ],
+        max_tokens=200,
+        n=1,
+        stop=None,
+        temperature=0.1,
+    )
+    return response['choices'][0]['message']['content'].strip()
+
+# 사용자 질문 입력받기
+user_question = input("휴가 종류에 대해서 알려줘.")
+
+# 질문에 대한 답변 출력
+answer = ask_question(user_question, doc_text)
+print(f"Answer: {answer}")
