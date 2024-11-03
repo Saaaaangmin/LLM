@@ -1,60 +1,0 @@
-# LLM Test (POS-CAT)
-
-from langchain_openai import ChatOpenAI
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import StrOutputParser
-from langchain_community.utilities import SQLDatabase
-from langchain.chains import create_sql_query_chain
-from langchain_openai import ChatOpenAI
-from langchain_community.tools.sql_database.tool import QuerySQLDataBaseTool
-from langchain_core.output_parsers import StrOutputParser
-from langchain_core.prompts import PromptTemplate
-from langchain_core.runnables import RunnablePassthrough
-from operator import itemgetter
-
-
-# MariaDB에 연결
-db = SQLDatabase.from_uri("mysql+pymysql://nicegpt:gpttest2024!@59.16.185.27:5030/gpttest")
-print("######"+db.dialect + "db 연결 완료 ######")
-print(db.get_usable_table_names())
-
-llm = ChatOpenAI(model="gpt-4o", temperature=0,api_key="")
-chain = create_sql_query_chain(llm, db)
-response = chain.invoke({"question": ""})
-response
-
-execute_query = QuerySQLDataBaseTool(db=db)
-write_query = create_sql_query_chain(llm, db)
-chain = write_query | execute_query
-
-
-# Prompt
-answer_prompt = PromptTemplate.from_template(
-    """너는 나이스정보통신 10년차 개발자이자 민원 응대 챗봇이야. 축적된 데이터베이스 범위 안에서만 대답해주고, 알고 있는 만큼 전부 한국어로 답변해줘. 만약 답변 내용이 부족하고, 질문 내용이 'POS_CAT', 'POS_CAT_SERVICECODE' 테이블 범위에 포함될 경우 CS개발실 담당자 연락처는 '02-2187-3638' 이라고 안내해줘.
- 또는 답변이 부족하고 질문 내용이 'NICE_RESPONSE', 'TAPS_COMPANY', 'TAPS_RESPONSE', 'TAPS_RESPONSE_REG' 테이블 안에 포함될 경우 TAPS 담당자는 '02-2187-3131' 이라고 안내해줘. 
- 또는 답변이 부족하고 질문 내용이 'TD_CHNL_ARVI_TRADE', 'TD_CHNL_FIELD_INFO', 'TD_CHNL_FIELD_VAL', 'TD_CHNL_INFO', 'TD_TAPS_RESPONSE' 테이블 안에 포함될 경우 대외계 담당자는 '02-2187-3232' 이라고 안내해줘. 
- 그리고 'POS_CAT' 테이블의 각 열 사이에는 FS 값으로 구분되어있고, POS_CAT 테이블의 행을 거래 전문 개념이라 생각하고 각 열의 길이/설정 정보나 데이터유형 정보가 다를경우 '전문 에러' 라는 답변과 함께 사유도 대답해줘.
- 그리고 전문에 대해 분석 요청 질문을 받았을 때는, 전문 에러 여부를 테이블 내 열 데이터에 포함된 값인지의 여부가 기준이 아니라 각 열의 '길이/설정' 정보에 부합하는지를 기준으로 판단해줘.
- 그리고 답변 내용이 'POS_CAT', 'POS_CAT_SERVICECODE' 테이블에 포함될 경우에는 답변 마지막에 ServiceCode에 대해 'POS_CAT_SERVICECODE' 테이블의 설명 정보를 함께 답변해줘.
- 참고로 만약, 질문에 SERVICE_CODE 값이 포함되어 있으면 무조건 'POS_CAT', 'POS_CAT_SERVICECODE' 테이블 범위 안에서만 답변해야해.
- 표 또는 그림 형식으로 출력 요청 시에는, 표 또는 그림으로 생성해줘. 답변 형태는 <p></p> 안에 출력가능한 html 문법으로 만들어줘.
-
-Question: {question}
-SQL Query: {query}
-SQL Result: {result}
-Answer: """
-)
-
-answer = answer_prompt | llm | StrOutputParser()
-chain = (
-    RunnablePassthrough.assign(query=write_query).assign(
-        result=itemgetter("query") | execute_query
-    )
-    | answer
-)
-
-
-# Question
-result = chain.invoke({"question": "D1N0000000002000000020000000000000001004 전문에서 잘못된 부분 있으면 알려줘"})
-
-print(result)
